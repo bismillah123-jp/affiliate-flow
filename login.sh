@@ -1,14 +1,14 @@
 #!/bin/bash
 # login.sh — login Google Flow (minimal).
-# Memakai `gflow` CLI dari https://github.com/ffroliva/gflow-cli.
-# Sesi/profil di ~/.local/share/gflow-cli (atau $GFLOW_CLI_HOME bila di-set).
+# Memakai `gflow` CLI dari https://github.com/swissmarley/gflow-cli
+# (npm: @swissmarley/gflow-cli). Sesi/profil disimpan di .gflow/profiles/<name>.
 set -e
 cd "$(dirname "$0")"
 
 need_gflow() {
   command -v gflow >/dev/null || {
     echo "✘ perintah 'gflow' belum diinstall."
-    echo "  Install: pip install gflow-cli  (atau ./setup.sh)"
+    echo "  Install: npm install -g @swissmarley/gflow-cli  (atau ./setup.sh)"
     exit 1
   }
 }
@@ -19,13 +19,10 @@ case "${1:-}" in
     gflow doctor >/dev/null 2>&1 \
       && echo "✔ Sesi valid. Pipeline siap jalan." \
       || { echo "✘ Sesi belum valid. Jalankan: ./login.sh"; exit 1; } ;;
-  --credits)
-    need_gflow
-    gflow credits user ;;
   *)
     need_gflow
     echo "== login Google Flow =="
-    echo "Browser kebuka — selesaikan login Google di sana."
+    echo "Chrome kebuka — selesaikan login Google di sana."
     gflow auth login
     echo ""
     gflow doctor >/dev/null 2>&1 \

@@ -1,7 +1,6 @@
 # Dependensi Python — SEMUA dari pip, tanpa binary sistem (tanpa ffmpeg).
 # Install via ./setup.sh ke .venv
-gflow-cli>=0.80         # otomasi Google Flow (ffroliva) — Nano Banana 2 + Omni Flash
-playwright>=1.40        # browser engine untuk gflow-cli
+# (gflow CLI di-install via npm: @swissmarley/gflow-cli — bukan dari sini)
 ddgs>=9.0               # pencarian gambar katalog (tanpa API key)
 pytrends>=4.9           # riset Google Trends (opsional, best-effort)
 av>=10.0                # verifikasi video (pengganti ffprobe, tanpa binary ffmpeg)

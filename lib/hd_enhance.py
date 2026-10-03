@@ -64,8 +64,7 @@ def main() -> None:
             out_png=str(out),
             model="Nano Banana 2",
             ratio="9:16",
-            refs=[str(img)],          # i2i: gambar katalognya sendiri
-            character=char_name,       # + referensi identitas produk
+            character=char_name,       # identitas produk dari character
             headed=a.headed)
     log("tahap HD selesai")
 

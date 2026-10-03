@@ -2,22 +2,22 @@
 """
 pipeline.py — Pipeline otomatis video affiliate TikTok/Shopee via Google Flow.
 
-Memakai `gflow` CLI dari https://github.com/ffroliva/gflow-cli
-(Python, pip install gflow-cli).
+Memakai `gflow` CLI dari https://github.com/swissmarley/gflow-cli
+(npm: @swissmarley/gflow-cli, Node.js).
 
 Alur (6 tahap):
   1. research   : riset produk viral (curated/manual/trends)
   2. images     : download gambar katalog (DuckDuckGo, tanpa API key)
-  3. hd         : HD + perjelas produk via Nano Banana 2 (gflow image i2i)
+  3. hd         : HD + perjelas produk via Nano Banana 2 (gflow image + character)
   4. storyboard : storyboard BERUPA GAMBAR per scene via Nano Banana 2
-  5. video      : storyboard -> video 10 dtk via Omni Flash (i2v, frames mode);
+  5. video      : storyboard -> video 10 dtk via Omni Flash (frames mode);
                   audio + voice-over Bahasa Indonesia DIBAKAR saat generate
   6. finish     : verifikasi final_10s.mp4 -> final.mp4 (tanpa ffmpeg!)
 
 TANPA ffmpeg (tidak butuh binary sistem), TANPA TTS pihak ketiga
 (voice-over sudah bawaan di video hasil generate).
 
-Konsistensi produk dijaga via referensi visual `aff-<slug>` (--ref).
+Konsistensi produk dijaga via Flow character `aff-<slug>` (--character).
 Anti-anomali via ANOMALY_GUARD di setiap prompt (lihat lib/prompts.py).
 
 Syarat sekali per mesin:
@@ -60,7 +60,7 @@ def preflight() -> None:
     log("preflight: cek sesi gflow ...")
     if shutil.which("gflow") is None:
         die("perintah `gflow` tidak ditemukan.\n"
-            "  Install: pip install gflow-cli  (atau ./setup.sh)")
+            "  Install: npm install -g @swissmarley/gflow-cli  (atau ./setup.sh)")
     r = subprocess.run(["gflow", "doctor"],
                        capture_output=True, text=True, timeout=300)
     if r.returncode != 0:

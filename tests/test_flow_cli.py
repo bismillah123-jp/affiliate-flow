@@ -2,6 +2,8 @@
 """test_flow_cli.py — uji lib/flow_cli.py dalam mode dry-run.
 
 Tanpa gflow / browser / kuota: semua generate dipalsukan jadi file dummy.
+Command builder (image_cmd/video_cmd/character_create_cmd) diuji sebagai
+fungsi murni — memastikan flag cocok dengan CLI swissmarley/gflow-cli.
 """
 import os
 import sys
@@ -35,14 +37,6 @@ class TestFlowCliDryRun(unittest.TestCase):
         got2 = fc.image_generate("job-1", "prompt lain", str(out))
         self.assertEqual(got2.stat().st_mtime, mtime)
 
-    def test_image_generate_with_refs(self):
-        ref = self.tmp / "ref.png"
-        ref.write_bytes(b"fake")
-        out = self.tmp / "hd.png"
-        got = fc.image_generate("job-2", "hd-kan", str(out),
-                                refs=[str(ref)], character="")
-        self.assertTrue(got.exists())
-
     def test_video_generate_dummy_10s(self):
         out = self.tmp / "final_10s.mp4"
         got = fc.video_generate("job-v", "prompt video", str(out),
@@ -52,22 +46,62 @@ class TestFlowCliDryRun(unittest.TestCase):
         self.assertTrue(got.exists())
         self.assertGreater(got.stat().st_size, 0)
 
-    def test_model_map(self):
-        self.assertEqual(fc._model("Nano Banana 2", "image"), "nano2")
-        self.assertEqual(fc._model("Omni Flash", "video"), "omni-flash")
 
-    def test_maybe_id_cached(self):
-        # _supports_id cache: panggil 2x, hasil konsisten bool
-        r1 = fc._supports_id(["image", "i2i"])
-        r2 = fc._supports_id(["image", "i2i"])
-        self.assertIsInstance(r1, bool)
-        self.assertEqual(r1, r2)
-        cmd = fc._maybe_id(["gflow", "image", "i2i", "p"], ["image", "i2i"], "job-x")
-        if r1:
-            self.assertIn("--id", cmd)
-            self.assertIn("job-x", cmd)
-        else:
-            self.assertNotIn("--id", cmd)
+class TestFlowCliCmd(unittest.TestCase):
+    def test_ratio_normalize(self):
+        self.assertEqual(fc._ratio("9x16"), "9:16")
+        self.assertEqual(fc._ratio("9:16"), "9:16")
+        self.assertEqual(fc._ratio("16x9"), "16:9")
+
+    def test_image_cmd_flags(self):
+        cmd = fc.image_cmd("job-x", "prompt", "/tmp/out",
+                           model="Nano Banana 2", ratio="9x16",
+                           character="aff-p")
+        self.assertEqual(cmd[:2], [fc.GFLOW_BIN, "image"])
+        self.assertIn("--id", cmd)
+        self.assertIn("job-x", cmd)
+        self.assertIn("--prompt", cmd)
+        self.assertIn("--model", cmd)
+        self.assertIn("Nano Banana 2", cmd)
+        self.assertIn("--ratio", cmd)
+        self.assertIn("9:16", cmd)          # ternormalisasi
+        self.assertNotIn("9x16", cmd)
+        self.assertIn("--out", cmd)
+        self.assertIn("--character", cmd)
+        self.assertIn("aff-p", cmd)
+        # tanpa subcommand i2i/t2i (CLI swissmarley: gflow image langsung)
+        self.assertNotIn("i2i", cmd)
+        self.assertNotIn("t2i", cmd)
+
+    def test_video_cmd_flags(self):
+        cmd = fc.video_cmd("job-v", "prompt", "/tmp/out",
+                           model="Omni Flash", ratio="9:16",
+                           duration=10, start_frame="/tmp/a.png",
+                           end_frame="/tmp/b.png", character="aff-p")
+        self.assertEqual(cmd[:2], [fc.GFLOW_BIN, "video"])
+        self.assertIn("--id", cmd)
+        self.assertIn("--prompt", cmd)
+        self.assertIn("--duration", cmd)
+        self.assertIn("10", cmd)
+        self.assertIn("--start-frame", cmd)
+        self.assertIn("/tmp/a.png", cmd)
+        self.assertIn("--end-frame", cmd)
+        self.assertIn("--character", cmd)
+        self.assertNotIn("i2v", cmd)
+        self.assertNotIn("--initial-frame", cmd)
+
+    def test_character_create_cmd_flags(self):
+        cmd = fc.character_create_cmd("aff-p", "desc", ["/tmp/a.png"])
+        self.assertEqual(cmd[:3], [fc.GFLOW_BIN, "character", "create"])
+        self.assertIn("--name", cmd)
+        self.assertIn("aff-p", cmd)
+        self.assertIn("--prompt", cmd)
+        self.assertIn("--image", cmd)
+        self.assertIn("/tmp/a.png", cmd)
+
+    def test_parse_character_list(self):
+        names = fc._parse_character_list("aff-pembersih-noda\naff-lain\n")
+        self.assertIn("aff-pembersih-noda", names)
 
 
 if __name__ == "__main__":
