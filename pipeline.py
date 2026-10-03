@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""
+pipeline.py — Pipeline otomatis video affiliate TikTok/Shopee via Google Flow.
+
+Memakai `gflow` CLI dari https://github.com/ffroliva/gflow-cli
+(Python, pip install gflow-cli).
+
+Alur (6 tahap):
+  1. research   : riset produk viral (curated/manual/trends)
+  2. images     : download gambar katalog (DuckDuckGo, tanpa API key)
+  3. hd         : HD + perjelas produk via Nano Banana 2 (gflow image i2i)
+  4. storyboard : storyboard BERUPA GAMBAR per scene via Nano Banana 2
+  5. video      : storyboard -> video 10 dtk via Omni Flash (i2v, frames mode);
+                  audio + voice-over Bahasa Indonesia DIBAKAR saat generate
+  6. finish     : verifikasi final_10s.mp4 -> final.mp4 (tanpa ffmpeg!)
+
+TANPA ffmpeg (tidak butuh binary sistem), TANPA TTS pihak ketiga
+(voice-over sudah bawaan di video hasil generate).
+
+Konsistensi produk dijaga via referensi visual `aff-<slug>` (--ref).
+Anti-anomali via ANOMALY_GUARD di setiap prompt (lihat lib/prompts.py).
+
+Syarat sekali per mesin:
+  ./setup.sh                        # install deps + gflow-cli + browser
+  python3 pipeline.py --auth        # = gflow auth login (sekali, sesi tersimpan)
+
+Pakai:
+  python3 pipeline.py --auto                       # full pipeline, produk top viral
+  python3 pipeline.py --product <slug>             # full pipeline 1 produk
+  python3 pipeline.py --product <slug> --from hd   # mulai dari tahap hd
+  python3 pipeline.py --product <slug> --only video
+  python3 pipeline.py --auto --dry-run             # uji end-to-end TANPA browser/kuota
+"""
+import argparse
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+LIB = ROOT / "lib"
+sys.path.insert(0, str(LIB))
+
+from common import log, die  # noqa: E402
+
+STAGES = ["research", "images", "hd", "storyboard", "video", "finish"]
+
+
+def sh(*cmd: str) -> None:
+    import subprocess
+    log("+ " + " ".join(cmd[:5]))
+    r = subprocess.run(cmd, timeout=3600)
+    if r.returncode != 0:
+        die(f"tahap gagal (exit {r.returncode}): {cmd[1]}")
+
+
+def preflight() -> None:
+    """Pastikan sesi gflow valid SEBELUM tahap berat jalan."""
+    import subprocess
+    import shutil
+    log("preflight: cek sesi gflow ...")
+    if shutil.which("gflow") is None:
+        die("perintah `gflow` tidak ditemukan.\n"
+            "  Install: pip install gflow-cli  (atau ./setup.sh)")
+    r = subprocess.run(["gflow", "doctor"],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        die("sesi Google Flow belum valid.\n"
+            "  Jalankan:  python3 pipeline.py --auth   (= gflow auth login)")
+    log("preflight OK: sesi gflow valid")
+
+
+def main() -> None:
+    a = argparse.ArgumentParser(description="Pipeline video affiliate otomatis")
+    a.add_argument("--product", default="",
+                   help="slug produk (mis. pembersih-noda)")
+    a.add_argument("--auto", action="store_true",
+                   help="pilih produk skor viral tertinggi")
+    a.add_argument("--manual-name", default="",
+                   help="nama produk (mode manual, tanpa riset)")
+    a.add_argument("--auth", action="store_true",
+                   help="login Google Flow sekali (= gflow auth login)")
+    a.add_argument("--from", dest="from_stage", default="research",
+                   choices=STAGES, help="mulai dari tahap")
+    a.add_argument("--only", choices=STAGES, help="cuma jalankan satu tahap")
+    a.add_argument("--list-stages", action="store_true")
+    a.add_argument("--dry-run", action="store_true",
+                   help="uji end-to-end tanpa browser / kuota")
+    a.add_argument("--headed", action="store_true",
+                   help="tampilkan browser (debug)")
+    args = a.parse_args()
+
+    if args.list_stages:
+        print("\n".join(f"{i + 1}. {s}" for i, s in enumerate(STAGES)))
+        return
+
+    if args.auth:
+        import subprocess
+        import shutil
+        if shutil.which("gflow") is None:
+            die("perintah `gflow` tidak ditemukan. Install: pip install gflow-cli")
+        log("menjalankan: gflow auth login (browser kebuka — login manual)")
+        r = subprocess.run(["gflow", "auth", "login"])
+        if r.returncode != 0:
+            die("gflow auth login gagal")
+        log("✔ login selesai")
+        return
+
+    if args.dry_run:
+        os.environ["AFFILIATE_DRY_RUN"] = "1"
+        log("mode DRY-RUN: semua panggilan browser/API dipalsukan")
+
+    if not args.product and not args.auto and not args.manual_name:
+        die("tentukan --product, --auto, atau --manual-name")
+
+    py = sys.executable
+    common = ["--dry-run"] if args.dry_run else []
+    headed = ["--headed"] if args.headed else []
+
+    def stage_research():
+        log("== [1/6] research ==")
+        if args.manual_name:
+            sh(py, str(LIB / "research.py"), "--manual", "--name", args.manual_name,
+               *common)
+            return
+        if args.auto:
+            sh(py, str(LIB / "research.py"), "--auto", *common)
+        else:
+            sh(py, str(LIB / "research.py"), "--pick", args.product, *common)
+
+    def stage_images(slug):
+        log("== [2/6] images ==")
+        sh(py, str(LIB / "fetch_images.py"), "--product", slug, *common)
+
+    def stage_hd(slug):
+        log("== [3/6] hd (Nano Banana 2) ==")
+        sh(py, str(LIB / "hd_enhance.py"), "--product", slug, *headed, *common)
+
+    def stage_storyboard(slug):
+        log("== [4/6] storyboard (gambar) ==")
+        sh(py, str(LIB / "storyboard.py"), "--product", slug, *headed, *common)
+
+    def stage_video(slug):
+        log("== [5/6] video (Omni Flash 10s, VO bawaan) ==")
+        sh(py, str(LIB / "gen_video.py"), "--product", slug, *headed, *common)
+
+    def stage_finish(slug):
+        log("== [6/6] finish (verifikasi) ==")
+        sh(py, str(LIB / "finish.py"), "--product", slug, *common)
+
+    if args.manual_name:
+        from common import slugify
+        slug = slugify(args.manual_name)
+    elif args.auto:
+        slug = None  # di-resolve setelah stage research jalan
+    else:
+        slug = args.product
+
+    stages = [args.only] if args.only else STAGES[STAGES.index(args.from_stage):]
+
+    if slug is None and "research" not in stages:
+        die("--auto/--manual-name butuh tahap research untuk resolve slug; "
+            "pakai --product <slug> bila mulai dari tengah")
+
+    # preflight sekali sebelum tahap yang butuh browser
+    BROWSER_STAGES = {"hd", "storyboard", "video"}
+    if not args.dry_run and any(s in BROWSER_STAGES for s in stages):
+        preflight()
+
+    if "research" in stages:
+        stage_research()
+        if args.auto or args.manual_name:
+            cands = sorted((ROOT / "products").glob("*/research.json"),
+                           key=lambda p: p.stat().st_mtime)
+            if not cands:
+                die("research tidak menghasilkan produk")
+            slug = max(cands, key=lambda p: p.stat().st_mtime).parent.name
+            log(f"slug ter-resolve: {slug}")
+
+    rest = {"images": stage_images, "hd": stage_hd, "storyboard": stage_storyboard,
+            "video": stage_video, "finish": stage_finish}
+    for s in stages:
+        if s == "research":
+            continue
+        rest[s](slug)
+
+    out = ROOT / "products" / slug / "final.mp4"
+    if "finish" in stages and out.exists():
+        print(f"\nPIPELINE SELESAI ✔  ->  {out} (ADA)")
+    elif "finish" in stages:
+        die(f"finish gagal: {out} tidak ada")
+    else:
+        print(f"\nTAHAP {', '.join(stages)} SELESAI ✔  (slug: {slug})")
+
+
+if __name__ == "__main__":
+    main()

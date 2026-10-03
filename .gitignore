@@ -1,0 +1,14 @@
+# hasil generate (jangan di-commit)
+products/
+# state dry-run
+.dryrun_*.json
+# venv & cache
+.venv/
+__pycache__/
+*.pyc
+# profil browser gflow (secrets!)
+.gflow/
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
