@@ -36,6 +36,32 @@ MODEL_MAP = {
     "omni flash": "omni-flash",
 }
 
+_ID_SUPPORT: dict = {}
+
+
+def _supports_id(subcmd: list) -> bool:
+    """Cek apakah subcommand gflow mendukung --id (wajib di versi baru).
+
+    Hasil di-cache per subcommand. Deteksi via --help, tanpa generate
+    (tidak membakar kuota).
+    """
+    key = tuple(subcmd)
+    if key not in _ID_SUPPORT:
+        try:
+            r = subprocess.run([GFLOW_BIN] + list(subcmd) + ["--help"],
+                               capture_output=True, text=True, timeout=30)
+            _ID_SUPPORT[key] = "--id" in r.stdout
+        except Exception:
+            _ID_SUPPORT[key] = False
+    return _ID_SUPPORT[key]
+
+
+def _maybe_id(cmd: list, subcmd: list, job_id: str) -> list:
+    if _supports_id(subcmd):
+        cmd += ["--id", job_id]
+    return cmd
+
+
 _DRY_STATE = ROOT / ".dryrun_flow.json"
 
 
@@ -133,14 +159,17 @@ def image_generate(job_id: str, prompt: str, out_png: str,
     tmpdir = Path(tempfile.mkdtemp(prefix=f"aff-{job_id}-"))
     try:
         if all_refs:
-            cmd = [GFLOW_BIN, "image", "i2i", prompt]
+            subcmd = ["image", "i2i"]
+            cmd = [GFLOW_BIN] + subcmd + [prompt]
             for r in all_refs:
                 cmd += ["--ref", r]
         else:
-            cmd = [GFLOW_BIN, "image", "t2i", prompt]
+            subcmd = ["image", "t2i"]
+            cmd = [GFLOW_BIN] + subcmd + [prompt]
         cmd += ["--model", _model(model, "image"),
                 "--aspect", ratio,
                 "--out", str(tmpdir)]
+        cmd = _maybe_id(cmd, subcmd, job_id)
         run(cmd, timeout=timeout)
         got = _newest(tmpdir, (".png", ".jpg", ".jpeg", ".webp"))
         if not got:
@@ -179,7 +208,8 @@ def video_generate(job_id: str, prompt: str, out_mp4: str,
 
     tmpdir = Path(tempfile.mkdtemp(prefix=f"aff-{job_id}-"))
     try:
-        cmd = [GFLOW_BIN, "video", "i2v", prompt,
+        subcmd = ["video", "i2v"]
+        cmd = [GFLOW_BIN] + subcmd + [prompt,
                "--initial-frame", start_frame]
         if end_frame:
             cmd += ["--end-frame", end_frame]
@@ -187,6 +217,7 @@ def video_generate(job_id: str, prompt: str, out_mp4: str,
                 "--aspect", ratio,
                 "--duration", str(duration),
                 "--out-dir", str(tmpdir)]
+        cmd = _maybe_id(cmd, subcmd, job_id)
         run(cmd, timeout=timeout)
         got = _newest(tmpdir, (".mp4",))
         if not got:

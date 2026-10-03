@@ -56,6 +56,19 @@ class TestFlowCliDryRun(unittest.TestCase):
         self.assertEqual(fc._model("Nano Banana 2", "image"), "nano2")
         self.assertEqual(fc._model("Omni Flash", "video"), "omni-flash")
 
+    def test_maybe_id_cached(self):
+        # _supports_id cache: panggil 2x, hasil konsisten bool
+        r1 = fc._supports_id(["image", "i2i"])
+        r2 = fc._supports_id(["image", "i2i"])
+        self.assertIsInstance(r1, bool)
+        self.assertEqual(r1, r2)
+        cmd = fc._maybe_id(["gflow", "image", "i2i", "p"], ["image", "i2i"], "job-x")
+        if r1:
+            self.assertIn("--id", cmd)
+            self.assertIn("job-x", cmd)
+        else:
+            self.assertNotIn("--id", cmd)
+
 
 if __name__ == "__main__":
     unittest.main()
