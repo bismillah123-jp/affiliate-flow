@@ -87,6 +87,9 @@ def main() -> None:
                    help="uji end-to-end tanpa browser / kuota")
     a.add_argument("--headed", action="store_true",
                    help="tampilkan browser (debug)")
+    a.add_argument("--project", default="",
+                   help="nama Flow project (wajib bila auto-create project gagal; "
+                        "bikin manual sekali di web Flow)")
     args = a.parse_args()
 
     if args.list_stages:
@@ -97,7 +100,8 @@ def main() -> None:
         import subprocess
         import shutil
         if shutil.which("gflow") is None:
-            die("perintah `gflow` tidak ditemukan. Install: pip install gflow-cli")
+            die("perintah `gflow` tidak ditemukan. "
+                "Install: npm install -g @swissmarley/gflow-cli")
         log("menjalankan: gflow auth login (browser kebuka — login manual)")
         r = subprocess.run(["gflow", "auth", "login"])
         if r.returncode != 0:
@@ -108,6 +112,10 @@ def main() -> None:
     if args.dry_run:
         os.environ["AFFILIATE_DRY_RUN"] = "1"
         log("mode DRY-RUN: semua panggilan browser/API dipalsukan")
+
+    if args.project:
+        os.environ["GFLOW_PROJECT"] = args.project
+        log(f"Flow project: {args.project}")
 
     if not args.product and not args.auto and not args.manual_name:
         die("tentukan --product, --auto, atau --manual-name")

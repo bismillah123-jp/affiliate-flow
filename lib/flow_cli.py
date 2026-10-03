@@ -39,6 +39,18 @@ from common import ROOT, is_dry_run, log, die, run, placeholder_png, placeholder
 
 GFLOW_BIN = shutil.which("gflow") or "gflow"
 
+# Nama Flow project: eksplisit > env GFLOW_PROJECT > "" (tanpa flag).
+# Character itu project-scoped; kalau CLI gagal auto-create project
+# ("No Flow project is open and one could not be created"), bikin project
+# manual sekali di web Flow lalu pass --project <nama>.
+def _project_name(explicit: str = "") -> str:
+    return explicit or os.environ.get("GFLOW_PROJECT", "")
+
+
+def _project_flag(explicit: str = "") -> list:
+    name = _project_name(explicit)
+    return ["--project", name] if name else []
+
 _DRY_STATE = ROOT / ".dryrun_flow.json"
 
 
@@ -89,19 +101,21 @@ def _parse_character_list(stdout: str) -> list:
 def character_exists(name: str) -> bool:
     if is_dry_run():
         return name in _dry_state().get("characters", [])
-    r = subprocess.run([GFLOW_BIN, "character", "list"],
+    r = subprocess.run([GFLOW_BIN, "character", "list"] + _project_flag(),
                        capture_output=True, text=True, timeout=120)
     return name in _parse_character_list(r.stdout)
 
 
 def character_create_cmd(name: str, prompt: str, images: list,
-                         model: str = "nano-banana-2") -> list:
+                         model: str = "nano-banana-2",
+                         project: str = "") -> list:
     cmd = [GFLOW_BIN, "character", "create",
            "--name", name,
            "--prompt", prompt,
            "--model", model]
     for img in images:
         cmd += ["--image", img]
+    cmd += _project_flag(project)
     return cmd
 
 
@@ -120,7 +134,19 @@ def character_ensure(name: str, image: str, prompt: str,
         return True
     if not Path(image).exists():
         die(f"file gambar character tidak ada: {image}")
-    run(character_create_cmd(name, prompt, [image]), timeout=900)
+    cmd = character_create_cmd(name, prompt, [image], project=project)
+    log("+ " + " ".join(cmd)[:160])
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0:
+        err = (r.stderr or "") + (r.stdout or "")
+        print(err[-2000:])
+        if "No Flow project" in err:
+            die("gflow butuh Flow project yang kebuka dan auto-create-nya gagal.\n"
+                "  Bikin project manual sekali di Flow web\n"
+                "  (https://labs.google/fx/tools/flow, misal bernama 'affiliate-flow'),\n"
+                "  lalu ulangi dengan:\n"
+                "    python3 pipeline.py --auto --project affiliate-flow")
+        die(f"gflow character create gagal (exit {r.returncode})")
     log(f"character tersimpan: {name}")
     return True
 
@@ -129,7 +155,8 @@ def character_ensure(name: str, image: str, prompt: str,
 
 def image_cmd(job_id: str, prompt: str, out_dir: str,
               model: str = "Nano Banana 2", ratio: str = "9:16",
-              character: str = "", timeout: int = 900) -> list:
+              character: str = "", timeout: int = 900,
+              project: str = "") -> list:
     cmd = [GFLOW_BIN, "image",
            "--id", job_id,
            "--prompt", prompt,
@@ -139,6 +166,7 @@ def image_cmd(job_id: str, prompt: str, out_dir: str,
            "--timeout", str(timeout)]
     if character:
         cmd += ["--character", character]
+    cmd += _project_flag(project)
     return cmd
 
 
@@ -164,7 +192,7 @@ def image_generate(job_id: str, prompt: str, out_png: str,
     tmpdir = Path(tempfile.mkdtemp(prefix=f"aff-{job_id}-"))
     try:
         run(image_cmd(job_id, prompt, str(tmpdir), model, ratio,
-                      character, timeout), timeout=timeout + 120)
+                      character, timeout, project), timeout=timeout + 120)
         got = _newest(tmpdir, (".png", ".jpg", ".jpeg", ".webp"), prefer=job_id)
         if not got:
             die(f"gflow image tidak menghasilkan file untuk job {job_id}")
@@ -182,7 +210,7 @@ def video_cmd(job_id: str, prompt: str, out_dir: str,
               model: str = "Omni Flash", ratio: str = "9:16",
               duration: int = 10, start_frame: str = "",
               end_frame: str = "", character: str = "",
-              timeout: int = 1800) -> list:
+              timeout: int = 1800, project: str = "") -> list:
     cmd = [GFLOW_BIN, "video",
            "--id", job_id,
            "--prompt", prompt,
@@ -197,6 +225,7 @@ def video_cmd(job_id: str, prompt: str, out_dir: str,
         cmd += ["--end-frame", end_frame]
     if character:
         cmd += ["--character", character]
+    cmd += _project_flag(project)
     return cmd
 
 
@@ -227,7 +256,7 @@ def video_generate(job_id: str, prompt: str, out_mp4: str,
     tmpdir = Path(tempfile.mkdtemp(prefix=f"aff-{job_id}-"))
     try:
         run(video_cmd(job_id, prompt, str(tmpdir), model, ratio, duration,
-                      start_frame, end_frame, character, timeout),
+                      start_frame, end_frame, character, timeout, project),
             timeout=timeout + 120)
         got = _newest(tmpdir, (".mp4",), prefer=job_id)
         if not got:

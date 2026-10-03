@@ -31,6 +31,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Render storyboard (gambar)")
     ap.add_argument("--product", required=True)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--project", default="",
+                    help="nama Flow project (atau env GFLOW_PROJECT)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if a.dry_run:
@@ -69,7 +71,7 @@ def main() -> None:
             model="Nano Banana 2",
             ratio="9:16",
             character=char_name,
-            headed=a.headed)
+            headed=a.headed, project=a.project)
     log("tahap storyboard selesai")
 
 

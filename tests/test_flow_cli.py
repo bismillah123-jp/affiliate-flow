@@ -103,6 +103,18 @@ class TestFlowCliCmd(unittest.TestCase):
         names = fc._parse_character_list("aff-pembersih-noda\naff-lain\n")
         self.assertIn("aff-pembersih-noda", names)
 
+    def test_project_flag(self):
+        self.assertEqual(fc._project_flag(""), [])
+        self.assertEqual(fc._project_flag("my-proj"), ["--project", "my-proj"])
+        os.environ["GFLOW_PROJECT"] = "env-proj"
+        try:
+            self.assertEqual(fc._project_name(), "env-proj")
+            cmd = fc.image_cmd("j", "p", "/tmp/o", project="")
+            self.assertIn("--project", cmd)
+            self.assertIn("env-proj", cmd)
+        finally:
+            del os.environ["GFLOW_PROJECT"]
+
 
 if __name__ == "__main__":
     unittest.main()

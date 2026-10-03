@@ -29,6 +29,8 @@ def main() -> None:
     ap.add_argument("--product", required=True)
     ap.add_argument("--model", default=os.environ.get("AFFILIATE_VIDEO_MODEL", "Omni Flash"))
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--project", default="",
+                    help="nama Flow project (atau env GFLOW_PROJECT)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if a.dry_run:
@@ -61,7 +63,7 @@ def main() -> None:
         start_frame=start,
         end_frame=end if end != start else "",
         character=char_name,
-        headed=a.headed)
+        headed=a.headed, project=a.project)
     log(f"tahap video selesai -> {out.name}")
 
 

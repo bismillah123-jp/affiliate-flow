@@ -27,6 +27,8 @@ def main() -> None:
     ap.add_argument("--product", required=True)
     ap.add_argument("--max", type=int, default=2)
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--project", default="",
+                    help="nama Flow project (atau env GFLOW_PROJECT)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     if a.dry_run:
@@ -51,7 +53,7 @@ def main() -> None:
         prompt=(f"Product reference for affiliate ads: {product['name']}. "
                 f"Visual identity: {product.get('product_visual', product['name'])}. "
                 "This is a PRODUCT, keep its packaging identical in every use."),
-        headed=a.headed)
+        headed=a.headed, project=a.project)
 
     hddir = pdir / "hd"
     hddir.mkdir(parents=True, exist_ok=True)
@@ -65,7 +67,7 @@ def main() -> None:
             model="Nano Banana 2",
             ratio="9:16",
             character=char_name,       # identitas produk dari character
-            headed=a.headed)
+            headed=a.headed, project=a.project)
     log("tahap HD selesai")
 
 
