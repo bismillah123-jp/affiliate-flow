@@ -146,6 +146,12 @@ def character_ensure(name: str, image: str, prompt: str,
                 "  (https://labs.google/fx/tools/flow, misal bernama 'affiliate-flow'),\n"
                 "  lalu ulangi dengan:\n"
                 "    python3 pipeline.py --auto --project affiliate-flow")
+        if "Could not find a Flow project" in err:
+            die("nama project tidak cocok dengan yang ada di akun Flow lu.\n"
+                "  Buka https://labs.google/fx/tools/flow di Chrome, lihat daftar\n"
+                "  project — namanya harus SAMA PERSIS (huruf besar/kecil).\n"
+                "  Kalau belum ada, bikin baru bernama 'affiliate-flow', lalu:\n"
+                "    python3 pipeline.py --auto --project affiliate-flow")
         die(f"gflow character create gagal (exit {r.returncode})")
     log(f"character tersimpan: {name}")
     return True
