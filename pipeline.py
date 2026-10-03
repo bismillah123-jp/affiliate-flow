@@ -88,8 +88,10 @@ def main() -> None:
     a.add_argument("--headed", action="store_true",
                    help="tampilkan browser (debug)")
     a.add_argument("--project", default="",
-                   help="nama Flow project (wajib bila auto-create project gagal; "
-                        "bikin manual sekali di web Flow)")
+                   help="nama Flow project. Opsional: bila dikosongkan, gflow "
+                        "memakai project yang sedang terbuka di Chrome. "
+                        "(Bila --project error 404, buka project manual di "
+                        "Chrome automation lalu jalan tanpa --project)")
     args = a.parse_args()
 
     if args.list_stages:
